@@ -85,8 +85,19 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins(self) -> list[str]:
-        """Comma-separated in the environment, a list here."""
-        return [origin.strip() for origin in self.cors_allowed_origins.split(",") if origin.strip()]
+        """Comma-separated in the environment, a list here.
+
+        Trailing slashes are stripped. A browser sends ``Origin:
+        https://app.vercel.app`` and never includes one, so a configured value
+        of ``https://app.vercel.app/`` would match nothing — and the symptom is
+        every request failing in the browser while curl works perfectly, which
+        sends people looking anywhere but the trailing slash.
+        """
+        return [
+            origin.strip().rstrip("/")
+            for origin in self.cors_allowed_origins.split(",")
+            if origin.strip()
+        ]
 
     @property
     def hf_configured(self) -> bool:

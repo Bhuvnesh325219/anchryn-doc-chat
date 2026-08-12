@@ -34,3 +34,24 @@ def test_an_explicit_driver_is_left_alone():
         "postgresql+asyncpg://user:pw@host/db",
     ):
         assert settings_with(url).database_url == url
+
+
+def cors_settings(value: str) -> Settings:
+    return Settings(database_url="postgresql+psycopg://u:p@h/d", cors_allowed_origins=value,
+                    _env_file=None)
+
+
+def test_a_trailing_slash_does_not_break_cors():
+    # Browsers send the origin without one, so a configured trailing slash
+    # matches nothing — and the symptom looks like anything but a slash.
+    assert cors_settings("https://app.vercel.app/").cors_origins == ["https://app.vercel.app"]
+
+
+def test_several_origins_are_split_and_trimmed():
+    result = cors_settings(" http://localhost:4200 , https://app.vercel.app/ ").cors_origins
+
+    assert result == ["http://localhost:4200", "https://app.vercel.app"]
+
+
+def test_empty_entries_are_dropped():
+    assert cors_settings("https://a.com,,").cors_origins == ["https://a.com"]
