@@ -78,6 +78,29 @@ jobs:
           echo "See DEPLOYMENT.md for where to find each one."
           exit 1
 
+      # "Could not retrieve Project Settings" from `vercel pull` gives no hint as
+      # to which value is wrong. Checking the shapes first turns the two most
+      # common mistakes — swapping the secrets, or pasting a project id from a
+      # different project — into a message that says so.
+      - name: Check the credential shapes
+        run: |
+          fail=0
+          case "$VERCEL_PROJECT_ID" in
+            prj_*) ;;
+            team_*) echo "::error::VERCEL_PROJECT_ID starts with 'team_' — the two secrets are swapped."; fail=1 ;;
+            *) echo "::error::VERCEL_PROJECT_ID should start with 'prj_'. Re-read .vercel/project.json."; fail=1 ;;
+          esac
+          case "$VERCEL_ORG_ID" in
+            prj_*) echo "::error::VERCEL_ORG_ID starts with 'prj_' — the two secrets are swapped."; fail=1 ;;
+            *) ;;
+          esac
+          if [ "$fail" = "0" ]; then
+            echo "Shapes look right (project ${VERCEL_PROJECT_ID%${VERCEL_PROJECT_ID#prj_????}}…)."
+            echo "If the pull still fails, the ids are well-formed but do not belong to"
+            echo "this token's account, or the project is under a team the token cannot see."
+          fi
+          exit "$fail"
+
       - name: Set up Node 24
         uses: actions/setup-node@v4
         with:
