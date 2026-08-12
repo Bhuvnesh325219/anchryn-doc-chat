@@ -37,6 +37,22 @@ app.include_router(documents.router)
 app.include_router(ask.router)
 
 
+@app.get("/", tags=["meta"])
+def root() -> dict[str, str]:
+    """Point a browser that lands on the bare URL somewhere useful.
+
+    Every route is under /api, so without this the first thing anyone opening
+    the deployed URL sees is a bare 404 — which reads as a broken deployment
+    rather than a working API with no homepage.
+    """
+    return {
+        "service": "Anchryn API",
+        "status": "running",
+        "docs": "/docs",
+        "health": "/api/health",
+    }
+
+
 @app.get("/api/health", tags=["meta"])
 def health() -> dict[str, object]:
     """Liveness, plus enough detail to diagnose a misconfigured deployment.

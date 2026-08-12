@@ -193,3 +193,15 @@ def test_a_page_beyond_the_document_is_404(client, created_documents, sample_pdf
     document_id = _upload(client, created_documents, sample_pdf).json()["id"]
 
     assert client.get(f"/api/documents/{document_id}/pages/99").status_code == 404
+
+
+def test_the_bare_url_points_somewhere_useful(client):
+    """A 404 on / reads as a broken deployment rather than a working API.
+
+    Every route lives under /api, so the root is the first thing anyone opening
+    the deployed URL hits.
+    """
+    body = client.get("/").json()
+
+    assert body["status"] == "running"
+    assert body["docs"] == "/docs"
