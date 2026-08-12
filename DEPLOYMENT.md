@@ -129,36 +129,53 @@ frontend pipeline, and vice versa.
 | Workflow | Triggers on | Jobs |
 |---|---|---|
 | [`backend.yml`](.github/workflows/backend.yml) | `backend/**`, `render.yaml` | `test` (pgvector service, ruff, pytest) → `docker` (image build) → `deploy` |
-| [`frontend.yml`](.github/workflows/frontend.yml) | `frontend/**` | `test` (headless Chrome, production build) → `deploy` |
+| [`frontend.yml`](.github/workflows/frontend.yml) | `frontend/**` | `test` (headless Chrome, production build) |
 
-Both accept **workflow_dispatch**, so either side can be redeployed from the
+The two sides deploy differently, on purpose:
+
+- **Backend** deploys from the workflow, via a Render deploy hook, so a red test
+  suite stops the deploy.
+- **Frontend** deploys through Vercel's own Git integration. Deploying it from
+  CI needs three secrets and fails with an opaque "Could not retrieve Project
+  Settings" if any one is wrong; the integration needs none. Path filtering is
+  done with an Ignored Build Step instead.
+
+Both workflows accept **workflow_dispatch**, so either can be re-run from the
 Actions tab without a commit.
+
+### Stopping Vercel from rebuilding on backend-only commits
+
+Vercel → project → Settings → Git → **Ignored Build Step**:
+
+```bash
+git diff --quiet HEAD^ HEAD -- .
+```
+
+Exit code 0 means "skip". With Root Directory set to `frontend/anchryn-web`, `.`
+resolves to that folder, so a commit touching only `backend/` is skipped.
 
 The backend job runs Postgres from the `pgvector/pgvector:pg17` image — plain
 `postgres` has no `vector` type and every migration would fail. It needs no
 Hugging Face token: generation is stubbed in tests, and the only `/api/answer`
 case is the refusal path, which returns before any model call.
 
-### ⚠️ Switch off the platforms' own auto-deploy
+### ⚠️ Switch off Render's auto-deploy
 
-Render and Vercel both redeploy on **any** push, ignoring which files changed.
-Leave them on and a backend-only commit still rebuilds the frontend — exactly
-what the split workflows prevent — and you get two deploys per push.
+Render redeploys on **any** push, ignoring which files changed. Leave it on and
+you get two backend deploys per push — one from Render, one from the workflow.
 
-- **Render** → Settings → **Auto-Deploy → No**
-- **Vercel** → Settings → Git → turn off automatic production deployments
+**Render** → Settings → **Auto-Deploy → No**.
+
+Leave Vercel's Git integration **on** — that is what deploys the frontend.
 
 ### Secrets
 
 | Secret | Where to get it |
 |---|---|
 | `RENDER_DEPLOY_HOOK_URL` | Render → Settings → Deploy Hook |
-| `VERCEL_TOKEN` | Vercel → Account Settings → Tokens |
-| `VERCEL_ORG_ID` | `npx vercel link` in `frontend/anchryn-web`, then read `.vercel/project.json` |
-| `VERCEL_PROJECT_ID` | same file |
 
-Both deploy jobs fail with an explicit message when their secrets are missing,
-rather than passing while silently doing nothing.
+One secret, for the backend. The deploy job fails with an explicit message if it
+is missing, rather than passing while silently doing nothing.
 
 ---
 
