@@ -5,5 +5,5 @@
  */
 export const environment = {
   production: true,
-  apiBaseUrl: '',
+  apiBaseUrl: 'https://anchryn-doc-chat.onrender.com',
 };
