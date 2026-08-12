@@ -1,0 +1,62 @@
+<div class="page">
+  <div class="card">
+    <div class="brand">
+      <span class="brand-mark">⚓</span>
+      <span class="brand-name">Anchryn</span>
+    </div>
+
+    <h1>{{ registering() ? 'Create an account' : 'Sign in' }}</h1>
+    <p class="sub">
+      Your documents are private to your account. Nobody else can read them, search them, or see
+      them in an answer.
+    </p>
+
+    @if (error(); as message) {
+      <p class="error">{{ message }}</p>
+    }
+
+    <label class="field">
+      <span class="label">Email</span>
+      <input
+        type="email"
+        class="input"
+        autocomplete="email"
+        [ngModel]="email()"
+        (ngModelChange)="email.set($event)"
+        (keydown.enter)="submit()"
+        name="email"
+      />
+    </label>
+
+    <label class="field">
+      <span class="label">Password</span>
+      <input
+        type="password"
+        class="input"
+        [autocomplete]="registering() ? 'new-password' : 'current-password'"
+        [ngModel]="password()"
+        (ngModelChange)="password.set($event)"
+        (keydown.enter)="submit()"
+        name="password"
+      />
+      @if (passwordTooShort()) {
+        <span class="hint">At least 8 characters. A short phrase beats a short password.</span>
+      }
+    </label>
+
+    <button type="button" class="btn btn-primary block" (click)="submit()" [disabled]="!canSubmit()">
+      @if (busy()) {
+        Working…
+      } @else {
+        {{ registering() ? 'Create account' : 'Sign in' }}
+      }
+    </button>
+
+    <p class="switch">
+      {{ registering() ? 'Already have an account?' : 'No account yet?' }}
+      <button type="button" class="link-btn" (click)="switchMode()">
+        {{ registering() ? 'Sign in' : 'Create one' }}
+      </button>
+    </p>
+  </div>
+</div>

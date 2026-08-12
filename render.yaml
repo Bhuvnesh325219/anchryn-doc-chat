@@ -1,0 +1,52 @@
+# Render blueprint. New -> Blueprint -> point at this repo.
+#
+# No database is declared here: the schema needs the pgvector extension, and an
+# external Postgres (Neon, Supabase) outlives Render's 30-day free database.
+# Set DATABASE_URL to that provider's connection string exactly as given: a
+# bare postgresql:// URL has the psycopg driver filled in automatically.
+#
+# Values marked sync:false are entered in the dashboard, never committed.
+
+services:
+  - type: web
+    name: anchryn-api
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./backend/anchryn-api/Dockerfile
+    dockerContext: ./backend/anchryn-api
+    healthCheckPath: /api/health
+    envVars:
+      # Signing key for access tokens. Render generates a strong random value
+      # on first deploy, so the development default can never reach production.
+      - key: JWT_SECRET
+        generateValue: true
+
+      # Full connection string from Neon or similar. Use the DIRECT endpoint,
+      # not a -pooler one: pgbouncer in transaction mode breaks prepared
+      # statements, and SQLAlchemy pools connections itself.
+      - key: DATABASE_URL
+        sync: false
+
+      - key: HF_TOKEN
+        sync: false
+
+      # Your Vercel URL, e.g. https://anchryn.vercel.app — comma-separated for
+      # several origins. Without it the browser blocks every request.
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+
+      - key: HF_MODEL
+        value: Qwen/Qwen2.5-7B-Instruct
+
+      - key: EMBEDDING_MODEL
+        value: BAAI/bge-small-en-v1.5
+
+      # Retrieval below this cosine similarity is treated as "not covered by the
+      # documents". Measured on a sample corpus; re-check it against your own.
+      - key: GROUNDING_THRESHOLD
+        value: "0.45"
+
+      # Strict TLS everywhere except behind a corporate inspecting proxy.
+      - key: TLS_STRICT
+        value: "true"

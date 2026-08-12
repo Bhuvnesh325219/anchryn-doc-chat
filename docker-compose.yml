@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: anchryn-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: anchryn
+      POSTGRES_USER: anchryn
+      POSTGRES_PASSWORD: anchryn_dev_pw
+    ports:
+      - "5434:5432"
+    volumes:
+      - anchryn_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U anchryn -d anchryn"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  anchryn_pgdata:

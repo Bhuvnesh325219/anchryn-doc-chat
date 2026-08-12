@@ -1,0 +1,6 @@
+# Test and lint tooling. Install with:
+#   pip install -r requirements.txt -r requirements-dev.txt
+
+pytest==9.1.1
+reportlab==5.0.0
+ruff==0.16.2

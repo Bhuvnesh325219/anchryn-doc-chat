@@ -1,0 +1,24 @@
+line-length = 100
+target-version = "py313"
+
+[lint]
+# BLE is enabled deliberately: this codebase catches broad exceptions in a few
+# places (pypdf, onnxruntime and httpx all raise widely), and having the rule on
+# means each one carries an explicit noqa explaining itself, rather than blind
+# excepts spreading unnoticed.
+extend-select = ["I", "B", "UP", "BLE", "C4", "SIM"]
+
+[lint.flake8-bugbear]
+# FastAPI expresses dependency injection as a call in a default argument. It is
+# the framework's core idiom, so B008 would mean a noqa on every single route.
+extend-immutable-calls = [
+    "fastapi.Body",
+    "fastapi.Depends",
+    "fastapi.File",
+    "fastapi.Form",
+    "fastapi.Query",
+]
+
+[lint.per-file-ignores]
+# Tests assert on behaviour and read better with long literal strings.
+"tests/**" = ["E501"]

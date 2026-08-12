@@ -1,0 +1,336 @@
+<div class="shell">
+  <!-- ---------------------------------------------------------- library -->
+  <aside class="library">
+    <div class="brand">
+      <span class="brand-mark">⚓</span>
+      <span class="brand-name">Anchryn</span>
+    </div>
+
+    <label class="upload">
+      <input type="file" accept="application/pdf" (change)="onFileSelected($event)" [disabled]="uploading()" />
+      <span class="upload-face">
+        @if (uploading()) {
+          Uploading and embedding…
+        } @else {
+          + Add a PDF
+        }
+      </span>
+    </label>
+
+    @if (uploadError(); as message) {
+      <p class="upload-error">
+        {{ message }}
+        <button type="button" class="link-btn" (click)="uploadError.set(null)">dismiss</button>
+      </p>
+    }
+
+    <button
+      type="button"
+      class="doc all-docs"
+      [class.selected]="scopeId() === null"
+      (click)="scopeTo(null)"
+    >
+      <span class="doc-name">All documents</span>
+      <span class="doc-meta">{{ documents().length }} uploaded</span>
+    </button>
+
+    <div class="doc-list">
+      @for (doc of documents(); track doc.id) {
+        <button
+          type="button"
+          class="doc"
+          [class.selected]="scopeId() === doc.id"
+          (click)="scopeTo(doc.id)"
+        >
+          <span class="doc-name">{{ doc.filename }}</span>
+          <span class="doc-meta">
+            {{ doc.page_count }} pages · {{ doc.chunk_count }} chunks · {{ formatSize(doc.size_bytes) }}
+          </span>
+          @if (doc.status !== 'READY') {
+            <span class="doc-status" [class.failed]="doc.status === 'FAILED'">{{ doc.status }}</span>
+          }
+          @if (doc.error) {
+            <span class="doc-error">{{ doc.error }}</span>
+          }
+          <span
+            class="doc-delete"
+            role="button"
+            tabindex="0"
+            aria-label="Delete document"
+            (click)="removeDocument(doc.id, $event)"
+            (keydown.enter)="removeDocument(doc.id, $any($event))"
+            >×</span
+          >
+        </button>
+      } @empty {
+        <p class="library-empty">
+          No documents yet. Upload a PDF and Anchryn will answer questions from it — and only from it.
+        </p>
+      }
+    </div>
+
+    @if (health(); as h) {
+      <div class="health">
+        <span [class.bad]="h.database !== 'up'">db {{ h.database }}</span>
+        <span [class.bad]="!h.hf_configured">{{ h.hf_configured ? 'model ready' : 'no HF token' }}</span>
+      </div>
+    }
+  </aside>
+
+  <!-- ------------------------------------------------------------- chat -->
+  <main class="main">
+    <header class="topbar">
+      <div class="scope">
+        <span class="scope-label">Answering from</span>
+        <span class="scope-value">{{ scopeName() }}</span>
+      </div>
+      @if (turns().length) {
+        <button type="button" class="btn btn-ghost" (click)="clearConversation()">Clear</button>
+      }
+      <div class="account">
+        @if (auth.user(); as user) {
+          <span class="account-email" [title]="user.email">{{ user.email }}</span>
+        }
+        <button type="button" class="btn btn-ghost" (click)="auth.signOut()">Sign out</button>
+      </div>
+    </header>
+
+    @if (health(); as h) {
+      @if (!h.hf_configured) {
+        <div class="banner banner-warn">
+          No Hugging Face token is configured on the backend. Retrieval works, but answers cannot be
+          generated.
+        </div>
+      }
+    }
+
+    @if (error(); as message) {
+      <div class="banner banner-error">
+        <span>{{ message }}</span>
+        <button type="button" class="banner-close" (click)="error.set(null)" aria-label="Dismiss">×</button>
+      </div>
+    }
+
+    <section class="thread" #scrollPane>
+      <div class="thread-inner">
+        @if (!turns().length) {
+          <div class="intro">
+            <h1>Ask your documents</h1>
+            <p>
+              Every answer is built only from passages retrieved from what you have uploaded, and
+              shows which passage it used. When nothing in the documents covers your question,
+              Anchryn says so instead of guessing.
+            </p>
+            @if (!ready()) {
+              <p class="intro-hint">Upload a PDF on the left to begin.</p>
+            }
+          </div>
+        }
+
+        @for (turn of turns(); track turn.id) {
+          <article class="turn">
+            <div class="question">
+              <span class="who">You</span>
+              <p>{{ turn.question }}</p>
+            </div>
+
+            @if (turn.pending) {
+              <div class="answer pending">
+                <span class="who">Anchryn</span>
+                <div class="typing"><span></span><span></span><span></span></div>
+                <span class="typing-label">Retrieving, then answering…</span>
+              </div>
+            } @else if (turn.error) {
+              <div class="answer failed">
+                <span class="who">Anchryn</span>
+                <p class="answer-text">{{ turn.error }}</p>
+              </div>
+            } @else if (turn.answer; as answer) {
+              <div class="answer" [class.refusal]="!answer.grounded">
+                <span class="who">Anchryn</span>
+
+                <div class="answer-body">
+                  @for (block of turn.blocks ?? []; track $index) {
+                    @if (block.kind === 'para') {
+                      <p class="answer-para">
+                        <ng-container
+                          [ngTemplateOutlet]="inlineTpl"
+                          [ngTemplateOutletContext]="{ $implicit: block.inlines }"
+                        />
+                      </p>
+                    } @else if (block.ordered) {
+                      <ol class="answer-list">
+                        @for (item of block.items; track $index) {
+                          <li>
+                            <ng-container
+                              [ngTemplateOutlet]="inlineTpl"
+                              [ngTemplateOutletContext]="{ $implicit: item }"
+                            />
+                          </li>
+                        }
+                      </ol>
+                    } @else {
+                      <ul class="answer-list">
+                        @for (item of block.items; track $index) {
+                          <li>
+                            <ng-container
+                              [ngTemplateOutlet]="inlineTpl"
+                              [ngTemplateOutletContext]="{ $implicit: item }"
+                            />
+                          </li>
+                        }
+                      </ul>
+                    }
+                  }
+                </div>
+
+                @if (answer.grounded && citedSources(answer).length) {
+                  <div class="sources">
+                    <span class="sources-label">Sources</span>
+                    @for (source of citedSources(answer); track source.chunk_id) {
+                      <button type="button" class="source-chip" (click)="openSource(source)">
+                        {{ source.filename }} · p{{ source.page_number }}
+                        <span class="source-score">{{ source.similarity | number: '1.2-2' }}</span>
+                      </button>
+                    }
+                  </div>
+                }
+
+                <!-- Why this answer -->
+                <button type="button" class="details-toggle" (click)="toggleDetails(turn.id)">
+                  {{ isExpanded(turn.id) ? '▾' : '▸' }} Why this answer
+                  <span class="details-summary">
+                    best match {{ answer.best_similarity | number: '1.2-2' }},
+                    threshold {{ answer.threshold | number: '1.2-2' }}
+                  </span>
+                </button>
+
+                @if (isExpanded(turn.id)) {
+                  <div class="details">
+                    <p class="details-note">
+                      These are the passages retrieval returned, scored by similarity to the
+                      question. The answer could only be built from these.
+                      @if (!answer.grounded) {
+                        Nothing cleared the threshold, so no answer was generated.
+                      }
+                    </p>
+
+                    @for (result of answer.results; track result.chunk_id) {
+                      <div class="retrieved" [class.used]="isCited(answer, result)">
+                        <div class="retrieved-head">
+                          <span class="retrieved-where">
+                            {{ result.filename }} · page {{ result.page_number }}
+                            @if (isCited(answer, result)) {
+                              <span class="used-tag">used</span>
+                            }
+                          </span>
+                          <span
+                            class="retrieved-score"
+                            [class]="scoreClass(result.similarity, answer.threshold)"
+                          >{{ result.similarity | number: '1.3-3' }}</span>
+                        </div>
+                        <div class="score-bar">
+                          <div
+                            class="score-fill"
+                            [class]="scoreClass(result.similarity, answer.threshold)"
+                            [style.width.%]="scorePercent(result.similarity)"
+                          ></div>
+                        </div>
+                        <p class="retrieved-text" (click)="openSource(result)">{{ result.text }}</p>
+                      </div>
+                    }
+
+                    <p class="details-model">Answered by {{ answer.model }}</p>
+                  </div>
+                }
+              </div>
+            }
+          </article>
+        }
+      </div>
+    </section>
+
+    <footer class="composer">
+      <textarea
+        class="composer-input"
+        rows="2"
+        [placeholder]="ready()
+          ? 'Ask something answerable from your documents…  (Enter to send)'
+          : 'Upload a PDF first'"
+        [ngModel]="draft()"
+        (ngModelChange)="draft.set($event)"
+        (keydown)="onKeydown($event)"
+        [disabled]="!ready()"
+        name="draft"
+      ></textarea>
+      <button type="button" class="btn btn-primary send" (click)="send()" [disabled]="!canSend()">
+        Ask
+      </button>
+    </footer>
+  </main>
+
+  <!-- ------------------------------------------------------ source viewer -->
+  @if (openCitation(); as citation) {
+    <div class="drawer-scrim" (click)="closeSource()"></div>
+    <aside class="drawer">
+      <header class="drawer-head">
+        <div>
+          <strong>{{ citation.filename }}</strong>
+          <span class="drawer-sub">page {{ citation.page_number }} · characters {{ citation.char_start }}–{{ citation.char_end }}</span>
+        </div>
+        <button type="button" class="banner-close" (click)="closeSource()" aria-label="Close">×</button>
+      </header>
+
+      <div class="drawer-body">
+        @if (pageLoading()) {
+          <p class="drawer-loading">Loading the page…</p>
+        } @else if (sourceView(); as view) {
+          <p class="drawer-note">
+            The highlighted text is exactly the passage that was retrieved, sliced from the stored
+            page by its character offsets.
+          </p>
+          <div class="page-text">
+            @if (view.trimmedStart) {
+              <span class="ellipsis">…</span>
+            }<span class="context">{{ view.before }}</span><mark>{{ view.match }}</mark
+            ><span class="context">{{ view.after }}</span>@if (view.trimmedEnd) {
+              <span class="ellipsis">…</span>
+            }
+          </div>
+        }
+      </div>
+    </aside>
+  }
+</div>
+
+<!--
+  Shared renderer for the inline pieces of an answer. Every piece is a real
+  element built from parsed data — no HTML is ever constructed from model
+  output, so nothing needs sanitising.
+-->
+<ng-template #inlineTpl let-inlines>
+  @for (inline of inlines; track $index) {
+    @switch (inline.kind) {
+      @case ('text') {
+        <span>{{ inline.value }}</span>
+      }
+      @case ('bold') {
+        <strong>{{ inline.value }}</strong>
+      }
+      @case ('code') {
+        <code>{{ inline.value }}</code>
+      }
+      @case ('cite') {
+        <button
+          type="button"
+          class="cite"
+          [disabled]="!inline.citation"
+          [title]="inline.citation
+            ? inline.citation.filename + ', page ' + inline.citation.page_number
+            : 'This reference does not match any retrieved passage'"
+          (click)="openSource(inline.citation)"
+        >{{ inline.index }}</button>
+      }
+    }
+  }
+</ng-template>
